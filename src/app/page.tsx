@@ -47,6 +47,29 @@ export default function Home() {
         dot.addEventListener('click', handleDotClick);
       });
     });
+
+    // Tab filtering logic
+    const filterBtns = document.querySelectorAll('.filters button');
+    const projectCards = document.querySelectorAll('.project-card');
+
+    filterBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const filter = btn.textContent?.trim() || 'All';
+
+        projectCards.forEach(card => {
+          const category = card.querySelector('.project-meta p')?.textContent?.trim();
+          
+          if (filter === 'All' || category === filter) {
+            (card as HTMLElement).style.display = 'block';
+          } else {
+            (card as HTMLElement).style.display = 'none';
+          }
+        });
+      });
+    });
   }, []);
 
   return (
