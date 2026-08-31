@@ -5,50 +5,90 @@ import { useEffect } from 'react';
 
 export default function Home() {
   useEffect(() => {
+    // 1. Infinite Carousel Logic
     const carousels = document.querySelectorAll('.showcase-carousel');
     carousels.forEach((carousel) => {
       const track = carousel.querySelector('.carousel-track') as HTMLElement;
-      const slides = carousel.querySelectorAll('.carousel-slide');
+      let originalSlides = Array.from(carousel.querySelectorAll('.carousel-slide'));
+      if (originalSlides.length === 0) return;
+
       const prevBtn = carousel.querySelectorAll('.carousel-arrows button')[0] as HTMLButtonElement;
       const nextBtn = carousel.querySelectorAll('.carousel-arrows button')[1] as HTMLButtonElement;
       const dots = carousel.querySelectorAll('.carousel-dots button');
       
-      let currentIndex = 0;
+      // Clone first and last slides for infinite scroll effect
+      const firstClone = originalSlides[0].cloneNode(true) as HTMLElement;
+      const lastClone = originalSlides[originalSlides.length - 1].cloneNode(true) as HTMLElement;
       
-      const updateCarousel = (index: number) => {
-        if (!track) return;
-        track.style.transform = `translateX(-${index * 100}%)`;
-        
+      firstClone.setAttribute('aria-hidden', 'true');
+      lastClone.setAttribute('aria-hidden', 'true');
+
+      track.appendChild(firstClone);
+      track.insertBefore(lastClone, originalSlides[0]);
+
+      // State
+      let currentIndex = 1; // start at 1 because 0 is the lastClone
+      let isTransitioning = false;
+      const totalOriginal = originalSlides.length;
+
+      // Initial position
+      track.style.transition = 'none';
+      track.style.transform = `translateX(-100%)`;
+
+      const updateDots = (index: number) => {
         dots.forEach(dot => dot.classList.remove('active'));
-        if (dots[index]) dots[index].classList.add('active');
-        
-        slides.forEach(slide => slide.setAttribute('aria-hidden', 'true'));
-        if (slides[index]) slides[index].setAttribute('aria-hidden', 'false');
+        // Normalize index for dots (1 -> 0, totalOriginal -> totalOriginal - 1)
+        let dotIndex = index - 1;
+        if (dotIndex < 0) dotIndex = totalOriginal - 1;
+        if (dotIndex >= totalOriginal) dotIndex = 0;
+        if (dots[dotIndex]) dots[dotIndex].classList.add('active');
       };
 
+      const updateCarousel = (index: number, animate = true) => {
+        if (!track) return;
+        isTransitioning = true;
+        track.style.transition = animate ? 'transform 0.6s cubic-bezier(0.22, 1, 0.36, 1)' : 'none';
+        track.style.transform = `translateX(-${index * 100}%)`;
+        updateDots(index);
+      };
+
+      track.addEventListener('transitionend', () => {
+        isTransitioning = false;
+        // Snap back without animation if we reached the clones
+        if (currentIndex === totalOriginal + 1) {
+          currentIndex = 1;
+          updateCarousel(currentIndex, false);
+        } else if (currentIndex === 0) {
+          currentIndex = totalOriginal;
+          updateCarousel(currentIndex, false);
+        }
+      });
+
       const handleNext = () => {
-        currentIndex = (currentIndex + 1) % slides.length;
+        if (isTransitioning) return;
+        currentIndex++;
         updateCarousel(currentIndex);
       };
 
       const handlePrev = () => {
-        currentIndex = (currentIndex - 1 + slides.length) % slides.length;
+        if (isTransitioning) return;
+        currentIndex--;
         updateCarousel(currentIndex);
       };
 
       nextBtn?.addEventListener('click', handleNext);
       prevBtn?.addEventListener('click', handlePrev);
 
-      dots.forEach((dot, index) => {
-        const handleDotClick = () => {
-          currentIndex = index;
+      dots.forEach((dot, idx) => {
+        dot.addEventListener('click', () => {
+          if (isTransitioning) return;
+          currentIndex = idx + 1;
           updateCarousel(currentIndex);
-        };
-        dot.addEventListener('click', handleDotClick);
+        });
       });
     });
 
-    // Tab filtering logic
+    // 2. Smooth Tab Filtering Logic
     const filterBtns = document.querySelectorAll('.filters button');
     const projectCards = document.querySelectorAll('.project-card');
 
@@ -60,12 +100,20 @@ export default function Home() {
         const filter = btn.textContent?.trim() || 'All';
 
         projectCards.forEach(card => {
+          const htmlCard = card as HTMLElement;
           const category = card.querySelector('.project-meta p')?.textContent?.trim();
-          
-          if (filter === 'All' || category === filter) {
-            (card as HTMLElement).style.display = 'block';
+          const shouldShow = filter === 'All' || category === filter;
+
+          if (shouldShow) {
+            if (htmlCard.style.display === 'none') {
+              htmlCard.style.display = 'block';
+              htmlCard.animate([
+                { opacity: 0, transform: 'translateY(15px) scale(0.98)' },
+                { opacity: 1, transform: 'translateY(0) scale(1)' }
+              ], { duration: 500, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'forwards' });
+            }
           } else {
-            (card as HTMLElement).style.display = 'none';
+            htmlCard.style.display = 'none';
           }
         });
       });
